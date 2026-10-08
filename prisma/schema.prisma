@@ -1,0 +1,223 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum DocumentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  firstName     String
+  lastName      String
+  role          Role      @default(USER)
+  avatar        String?
+  isActive      Boolean   @default(true)
+  emailVerified Boolean   @default(false)
+  refreshToken  String?
+  resetToken    String?
+  resetTokenExpires DateTime?
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  documents     Document[]
+  chats         Chat[]
+  workspaceMemberships WorkspaceMember[]
+  ownedWorkspaces Workspace[]
+  usageLogs     UsageLog[]
+  apiKeys       ApiKey[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  slug        String   @unique
+  isDefault   Boolean  @default(false)
+  ownerId     String
+  settings    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  members     WorkspaceMember[]
+  documents   Document[]
+  chats       Chat[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String   @id @default(uuid())
+  workspaceId String
+  userId      String
+  role        String   @default("MEMBER")
+  createdAt   DateTime @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@map("workspace_members")
+}
+
+model Document {
+  id              String         @id @default(uuid())
+  name            String
+  originalName    String
+  description     String?
+  fileType        String
+  mimeType        String
+  size            BigInt
+  path            String
+  url             String?
+  status          DocumentStatus @default(PENDING)
+  processingError String?
+  pageCount       Int?
+  wordCount       Int?
+  language        String?
+  summary         String?
+  tags            String[]
+  keywords        String[]
+  userId          String
+  workspaceId     String
+  qdrantCollectionId String?
+  metadata        Json?
+  chunkCount      Int?
+  embeddingModel  String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  processedAt     DateTime?
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  chunks          DocumentChunk[]
+  messages        Message[]
+
+  @@map("documents")
+}
+
+model DocumentChunk {
+  id          String   @id @default(uuid())
+  documentId  String
+  content     String
+  chunkIndex  Int
+  pageNumber  Int?
+  startChar   Int?
+  endChar     Int?
+  embedding   Float[]
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@map("document_chunks")
+}
+
+model Chat {
+  id          String   @id @default(uuid())
+  title       String
+  userId      String
+  workspaceId String
+  model       String?
+  temperature Float?
+  maxTokens   Int?
+  totalTokens Int      @default(0)
+  totalCost   Float    @default(0)
+  isArchived  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  messages    Message[]
+
+  @@map("chats")
+}
+
+model Message {
+  id          String      @id @default(uuid())
+  chatId      String
+  role        MessageRole
+  content     String
+  sources     Json?
+  tokensUsed  Int?
+  cost        Float?
+  model       String?
+  metadata    Json?
+  createdAt   DateTime    @default(now())
+
+  chat        Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  documents   Document[]
+
+  @@map("messages")
+
+}
+
+model UsageLog {
+  id          String   @id @default(uuid())
+  userId      String
+  action      String
+  model       String?
+  tokensUsed  Int?
+  cost        Float?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("usage_logs")
+}
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  name        String
+  key         String    @unique
+  userId      String
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
+}
