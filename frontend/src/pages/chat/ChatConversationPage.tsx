@@ -212,7 +212,7 @@ export function ChatConversationPage() {
 
     try {
       const isProd = typeof process !== 'undefined' && process.env?.NODE_ENV === 'production' || (import.meta as any).env?.PROD;
-      const apiBaseUrl = isProd ? 'https://rag-backend-zy02.onrender.com/api' : '/api';
+      const apiBaseUrl = isProd ? 'https://rag-knowledge-base-8p3i.onrender.com/api' : '/api';
 
       const response = await fetch(`${apiBaseUrl}/chats/${id}/messages`, {
         method: 'POST',
